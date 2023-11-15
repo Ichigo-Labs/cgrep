@@ -3,6 +3,14 @@
   "version": "0.0.0-managed-by-semantic-release",
   "author": "Ichigo LLC",
   "license": "MIT",
+  "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Ichigo-Labs/cgrep.git"
+  },
   "files": [
     "dist"
   ],

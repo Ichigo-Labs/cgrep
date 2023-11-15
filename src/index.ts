@@ -176,7 +176,7 @@ export type CGrepCheckParams = {
 		checkMessage: string,
 		alert?: 'error' | 'warn' | 'warning' | 'info'
 	) => void;
-}
+};
 
 /** Alias for `CGrepCheckParams`. */
 export type CGrepCheckArgs = CGrepCheckParams;

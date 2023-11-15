@@ -132,7 +132,7 @@ async function importCgrepFiles(fullFilePath: string[]) {
 		if (!isCheckFile) continue;
 
 		try {
-			let javascriptString = "";
+			let javascriptString = '';
 			const fileContents = fs.readFileSync(filePath, { encoding: 'utf-8' });
 			if (fileExtension === '.js') {
 				javascriptString = fileContents;
@@ -146,15 +146,17 @@ async function importCgrepFiles(fullFilePath: string[]) {
 					tsConfigString = fs.readFileSync(options.project, { encoding: 'utf-8' });
 				} else {
 					tsFileName = 'tsconfig.json';
-					tsConfigString = ts.sys.readFile('tsconfig.json', 'utf8');	
+					tsConfigString = ts.sys.readFile('tsconfig.json', 'utf8');
 				}
-				
+
 				const tsConfig = ts.parseConfigFileTextToJson(tsFileName, tsConfigString as string);
-				const compiled = ts.transpileModule(fileContents, { compilerOptions: tsConfig.config.compilerOptions });
+				const compiled = ts.transpileModule(fileContents, {
+					compilerOptions: tsConfig.config.compilerOptions,
+				});
 				javascriptString = compiled.outputText;
 			}
 			const cgrepModule = await import(`data:text/javascript,${javascriptString}`);
-	
+
 			const evalChecks: Function[] = [];
 			for (const key of Object.keys(cgrepModule)) {
 				const evalCheck = cgrepModule[key];
@@ -194,9 +196,7 @@ function logToConsole(
 
 	if (typeof checkMessage !== 'string') {
 		checkStatus = 1;
-		console.log(
-			'[Bad cgrep check] checkMessage must be a string. Check your cgrep files.\n'
-		);
+		console.log('[Bad cgrep check] checkMessage must be a string. Check your cgrep files.\n');
 		return;
 	}
 
