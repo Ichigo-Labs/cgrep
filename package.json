@@ -1,0 +1,43 @@
+{
+  "name": "@ichigo/cgrep",
+  "version": "0.0.0-managed-by-semantic-release",
+  "author": "Ichigo LLC",
+  "license": "MIT",
+  "files": [
+    "dist"
+  ],
+  "bin": {
+    "cgrep": "./dist/cli-bootstrap.js"
+  },
+  "main": "./dist/cgrep.umd.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "lint": "prettier --check src tests",
+    "lint:fix": "prettier --write src tests",
+    "build": "rm -rf dist && tsc && vite build && cp src/cli-cgrep.ts dist/cli-cgrep.ts && cp src/cli-bootstrap.js dist/cli-bootstrap.js && cp cli-tsconfig.json dist/tsconfig.json",
+    "test": "vitest run",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^18.4.1",
+    "@commitlint/config-conventional": "^18.4.0",
+    "@rollup/plugin-typescript": "^11.1.5",
+    "eslint": "^8.53.0",
+    "eslint-prettier": "^0.0.0-empty",
+    "husky": "^8.0.3",
+    "prettier": "^3.0.3",
+    "semantic-release": "^22.0.7",
+    "vite": "^4.4.5",
+    "vite-plugin-externalize-deps": "^0.7.0",
+    "vitest": "^0.34.6"
+  },
+  "dependencies": {
+    "@types/node": "^20.9.0",
+    "commander": "^11.1.0",
+    "global": "^4.4.0",
+    "ignore": "^5.2.4",
+    "ts-node": "^10.9.1",
+    "tslib": "^2.6.2",
+    "typescript": "^5.2.2"
+  }
+}
