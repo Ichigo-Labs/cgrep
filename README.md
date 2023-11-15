@@ -8,7 +8,7 @@ It includes
 - An extended regex grammar for finding code patterns.
 
 ```bash
-yarn add -D @ichigo/cgrep
+yarn add -D cgrep
 ```
 
 # command
@@ -33,7 +33,7 @@ On run, `cgrep` will
 1. Locate all `cgrep.config.(ts,js)` files in the project root or subdirectories and build a list of checks.
     - All publicly exported functions will be registered as a check. For example,
         ```typescript
-        import { cgrep, CGrepCheckArgs } from '@ichigo/cgrep';
+        import { cgrep, CGrepCheckArgs } from 'cgrep';
         export function avoidFooModule({ underline }: CGrepCheckArgs) {
             underline(
                 cgrep`import $$ from 'foo'`,
@@ -70,7 +70,7 @@ On run, `cgrep` will
 
 # module
 
-`@ichigo/cgrep` exports typings and one string interpolation function, `cgrep`.
+`cgrep` exports typings and one string interpolation function, `cgrep`.
 
 `cgrep` returns a standard `RegExp` object with two extra functions, `matchFirst` and `matchAll`. You can think of it as regex specifically for JavaScript code.
 

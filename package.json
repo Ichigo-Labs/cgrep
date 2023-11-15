@@ -1,5 +1,5 @@
 {
-  "name": "@ichigo/cgrep",
+  "name": "cgrep",
   "version": "0.0.0-managed-by-semantic-release",
   "author": "Ichigo LLC",
   "license": "MIT",
