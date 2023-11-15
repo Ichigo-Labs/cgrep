@@ -42,7 +42,7 @@ On run, `cgrep` will
         }
         ```
     
-1. Each check will be run against all project files. Log levels of `info` or `warn` will merely print to console, but `error` will cause `cgrep` to exit unsuccessfully.  
+1. Each check will be run against all project files. Log levels of `info` or `warn` will merely print to console, but `error` will cause `cgrep` to exit unsuccessfully. cgrep respects `.gitignore`.
     - Each check is passed the following args as an object:
         ```typescript
         {
