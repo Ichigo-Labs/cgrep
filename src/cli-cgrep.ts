@@ -93,8 +93,7 @@ async function main() {
 			regexOrText: RegExp | string,
 			checkMessage: string,
 			alert?: 'error' | 'warn' | 'warning' | 'info'
-		) =>
-			logToConsole(regexOrText, checkMessage, filePath, fileContents, lineNumberRanges, alert);
+		) => logToConsole(regexOrText, checkMessage, filePath, fileContents, lineNumberRanges, alert);
 
 		for (const check of checks) {
 			const result = check({ ...file, underline: boundLogToConsole });
