@@ -24,13 +24,14 @@ Options:
   -s, --staged          only check git staged files
   -d, --debug           print debug information
   -p, --project <path>  path to tsconfig.json
+  -g, --glob <pattern>  only check files matching glob pattern
   --cwd <path>          set the current working directory
   -h, --help            display help for command
 ```
 
 On run, `cgrep` will
 
-1. Locate all `cgrep.config.(ts,js)` files in the project root or subdirectories and build a list of checks.
+1. Load all checks from `cgrep.config.[ts,js]` in the project root.
     - All publicly exported functions will be registered as a check. For example,
         ```typescript
         import { cgrep, CGrepCheckArgs } from 'cgrep';
@@ -41,29 +42,27 @@ On run, `cgrep` will
                 "warn");
         }
         ```
-    
-1. Each check will be run against all project files. Log levels of `info` or `warn` will merely print to console, but `error` will cause `cgrep` to exit unsuccessfully. cgrep respects `.gitignore`.
+1. Each check will be run against all project files. `.gitignore` is respected. If a check returns `false`, the `cgrep` command will have a failure exit code.
     - Each check is passed the following args as an object:
         ```typescript
-        {
-        /** Eg 'C:\foo\bar'. Trailing slash not included. Filename not included. */
+        /** Eg 'src/components/foo.js'. Relative posix path format. */
         filePath: string;
-        
-        /** Eg 'example'. Extension not included. */
+
+        /** Eg 'example.js' */
         fileName: string;
-        
-        /** Eg 'js'. Leading period not included. */
+
+        /** Eg '.js' */
         fileExtension: string;
-        
+
         /** Eg 'console.log("hello world");' */
         fileContents: string;
-        
+
         /** Function to underline a string or regexp in `fileContents` and log it to console. */
-        underline:(
+        underline: (
             regexOrText: RegExp | string,
-            checkMessage: string,
-            alert?: 'error' | 'warn' | 'warning' | 'info') => void;
-        }
+            message: string,
+            alert?: 'error' | 'warn' | 'info'
+        ) => void;
         ```
 
 `cgrep` can be plugged in as part of a lint step in CI:CD or as a git commit hook.

@@ -153,28 +153,23 @@ export type CRegExp = RegExp & {
 };
 
 export type CGrepCheckParams = {
-	/** Eg 'C:\foo\bar'. Trailing slash not included. Filename not included. */
+	/** Eg 'src/components/foo.js'. Relative posix path format. */
 	filePath: string;
 
-	/** Eg 'example'. Extension not included. */
+	/** Eg 'example.js' */
 	fileName: string;
 
-	/** Eg 'js'. Leading period not included. */
+	/** Eg '.js' */
 	fileExtension: string;
 
 	/** Eg 'console.log("hello world");' */
 	fileContents: string;
 
-	/**
-	 * Function to underline a string or regexp in `fileContents` and log it to console.
-	 * An alert value of `error` will trigger a script failure.
-	 * @example
-	 * underline("import { foo } from 'bar';", "foo is deprecated", "warn")
-	 */
+	/** Function to underline a string or regexp in `fileContents` and log it to console. */
 	underline: (
 		regexOrText: RegExp | string,
-		checkMessage: string,
-		alert?: 'error' | 'warn' | 'warning' | 'info'
+		message: string,
+		alert?: 'error' | 'warn' | 'info'
 	) => void;
 };
 

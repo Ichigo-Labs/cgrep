@@ -2,11 +2,10 @@
 import ts from 'typescript';
 import fs from 'fs';
 import path from 'path';
-import ignore from 'ignore';
 import { Command } from 'commander';
 import child_process from 'child_process';
 const exec = child_process.execSync;
-const version = '1.0.0';
+const version = '2.0.0';
 
 // Parse CLI args.
 const program = new Command();
@@ -17,6 +16,7 @@ program
 	.option('-s, --staged', 'only check git staged files')
 	.option('-d, --debug', 'print debug information')
 	.option('-p, --project <path>', 'path to tsconfig.json')
+	.option('-g, --glob <pattern>', 'only check files matching glob pattern')
 	.option('--cwd <path>', 'set the current working directory');
 program.parse(process.argv);
 const options = program.opts();
@@ -34,56 +34,46 @@ if (options.cwd) {
 	// Check if cwd exists.
 	const cwdPath = path.resolve(options.cwd);
 	if (!fs.existsSync(cwdPath)) {
-		console.log(`[cgrep failure] cwd not found at ${cwdPath}`);
+		console.log(`[cgrep failure] valid cwd not found at ${cwdPath}`);
 		process.exit(1);
 	}
 }
 
-let checkStatus = 0; // Set to 1 if any step goes wrong.
-const projectRoot = options.cwd || process.cwd();
-const fullFilePaths: string[] = [];
+let checkStatus = 0; // Set to 1 if any step goes wrong or a check fails.
+const cwd = options.cwd || process.cwd();
 
-const gitignore = ignore().add(getGitIgnoreRules(projectRoot));
-const projectFiles = getProjectFiles(projectRoot, gitignore);
-
-if (options.staged) {
-	const stagedFiles = exec('git diff --staged --name-only', { encoding: 'utf8' })
-		.toString()
-		.split('\n')
-		.filter((x) => x);
-	fullFilePaths.push(...stagedFiles);
-} else {
-	fullFilePaths.push(...projectFiles);
-}
-
-doChecks().then(() => {
+main().then(() => {
 	process.exit(checkStatus);
 });
 
-async function doChecks() {
-	const checks = await importCgrepFiles(projectFiles);
+async function main() {
+	let files: string[] = [];
 
-	for (const fileToCheck of fullFilePaths) {
-		const fileToCheckPath = path.resolve(projectRoot, fileToCheck);
+	if (options.staged) {
+		files = exec('git diff --staged --name-only', { encoding: 'utf8' })
+			.toString()
+			.split('\n')
+			.filter((x) => x);
+	} else {
+		files = await getProjectFiles(options.glob || '**/*');
+	}
+
+	const checks = await importCgrepChecks();
+
+	for (const filePath of files) {
 		let fileContents: string;
 		try {
-			fileContents = fs.readFileSync(fileToCheckPath, { encoding: 'utf-8' });
+			fileContents = fs.readFileSync(filePath, { encoding: 'utf-8' });
 		} catch {
 			// File was locked, didn't exist, etc. Do nothing.
 			continue;
 		}
 
-		// Eg ['C:', 'foo', 'bar', 'example.js'] (or "home", "admin", "example.js" on *nix).
-		const filePathSegments: string[] = fileToCheckPath.split(path.sep);
+		// Eg 'example.js'.
+		const fileName = path.basename(filePath);
 
-		// Eg 'example'. Extension not included.
-		const fileName = filePathSegments.pop()?.replace(/\.[^/.]+$/, '');
-
-		// Eg 'C:\foo\bar'. Trailing slash not included. Filename not included.
-		const filePath = path.join(...filePathSegments);
-
-		// Eg 'js'. Leading period not included.
-		const fileExtension = (fileName && path.extname(fileToCheckPath).substring(1)) || '';
+		// Eg '.js'.
+		const fileExtension = path.extname(filePath);
 
 		const file = Object.freeze({
 			fileContents,
@@ -92,14 +82,10 @@ async function doChecks() {
 			fileExtension,
 		});
 
-		const isCheckFile =
-			(fileName === 'cgrep.config' ||
-				fileName?.endsWith('.cgrep.check') ||
-				fileExtension === '.cgreprc') &&
-			['js', 'ts'].includes(fileExtension);
+		const isCheckFile = fileName === 'cgrep.config.ts' || fileName === 'cgrep.config.js';
 		if (isCheckFile) continue; // Omit cgrep files from checks.
 
-		if (options.debug) console.log(`Checking: ${fileToCheck}`);
+		if (options.debug) console.log(`Checking: ${filePath}`);
 
 		const lineNumberRanges = getLineNumberRanges(fileContents);
 
@@ -108,70 +94,68 @@ async function doChecks() {
 			checkMessage: string,
 			alert?: 'error' | 'warn' | 'warning' | 'info'
 		) =>
-			logToConsole(regexOrText, checkMessage, fileToCheck, fileContents, lineNumberRanges, alert);
+			logToConsole(regexOrText, checkMessage, filePath, fileContents, lineNumberRanges, alert);
 
 		for (const check of checks) {
-			check({ ...file, underline: boundLogToConsole });
+			const result = check({ ...file, underline: boundLogToConsole });
+			if (result === false) {
+				checkStatus = 1;
+			}
 		}
 	}
 }
 
-async function importCgrepFiles(fullFilePath: string[]) {
+async function importCgrepChecks() {
 	const checks: Function[] = [];
-
-	// Look for cgrep files.
-	for (const filePath of fullFilePath) {
-		const fileExtension = path.extname(filePath);
-		const fileName = path.basename(filePath, fileExtension);
-		const isCheckFile =
-			(fileName === 'cgrep.config' ||
-				fileName?.endsWith('.cgrep.check') ||
-				fileExtension === '.cgreprc') &&
-			['.js', '.ts'].includes(fileExtension);
-
-		if (!isCheckFile) continue;
-
-		try {
-			let javascriptString = '';
-			const fileContents = fs.readFileSync(filePath, { encoding: 'utf-8' });
-			if (fileExtension === '.js') {
-				javascriptString = fileContents;
-			} else if (fileExtension === '.ts') {
-				let tsFileName;
-				let tsConfigString;
-
-				// If a tsconfig.json file is specified, use it instead.
-				if (options.project) {
-					tsFileName = path.basename(options.project, path.extname(options.project));
-					tsConfigString = fs.readFileSync(options.project, { encoding: 'utf-8' });
-				} else {
-					tsFileName = 'tsconfig.json';
-					tsConfigString = ts.sys.readFile('tsconfig.json', 'utf8');
-				}
-
-				const tsConfig = ts.parseConfigFileTextToJson(tsFileName, tsConfigString as string);
-				const compiled = ts.transpileModule(fileContents, {
-					compilerOptions: tsConfig.config.compilerOptions,
-				});
-				javascriptString = compiled.outputText;
-			}
-			const cgrepModule = await import(`data:text/javascript,${javascriptString}`);
-
-			const evalChecks: Function[] = [];
-			for (const key of Object.keys(cgrepModule)) {
-				const evalCheck = cgrepModule[key];
-				if (evalCheck instanceof Function) evalChecks.push(evalCheck);
-			}
-
-			if (options.debug)
-				console.log(`Imported: ${filePath} containing ${evalChecks.length} check(s).`);
-
-			checks.push(...evalChecks);
-		} catch (e) {
-			console.log(
-				`[cgrep failure] error processing ${filePath}\nError message: ${e.message}\nStack: ${e.stack}\n`
-			);
+	let cgrepFile = path.resolve(cwd, 'cgrep.config.ts');
+	if (!fs.existsSync(cgrepFile)) {
+		cgrepFile = path.resolve(cwd, 'cgrep.config.js');
+		if (!fs.existsSync(cgrepFile)) {
+			console.log('cgrep.config.[ts,js] not found in current working directory.\n');
+			process.exit(0);
 		}
+	}
+
+	const fileExtension = path.extname(cgrepFile);
+
+	try {
+		let javascriptString = '';
+		const fileContents = fs.readFileSync(cgrepFile, { encoding: 'utf-8' });
+		if (fileExtension === '.js') {
+			javascriptString = fileContents;
+		} else if (fileExtension === '.ts') {
+			let tsFileName;
+			let tsConfigString;
+
+			// If a tsconfig.json file is specified, use it instead.
+			if (options.project) {
+				tsFileName = path.basename(options.project, path.extname(options.project));
+				tsConfigString = fs.readFileSync(options.project, { encoding: 'utf-8' });
+			} else {
+				tsFileName = 'tsconfig.json';
+				tsConfigString = ts.sys.readFile('tsconfig.json', 'utf8');
+			}
+
+			const tsConfig = ts.parseConfigFileTextToJson(tsFileName, tsConfigString as string);
+			const compiled = ts.transpileModule(fileContents, {
+				compilerOptions: tsConfig.config.compilerOptions,
+			});
+			javascriptString = compiled.outputText;
+		}
+		const cgrepModule = await import(`data:text/javascript,${javascriptString}`);
+
+		const evalChecks: Function[] = [];
+		for (const key of Object.keys(cgrepModule)) {
+			const evalCheck = cgrepModule[key];
+			if (evalCheck instanceof Function) evalChecks.push(evalCheck);
+		}
+
+		if (options.debug)
+			console.log(`Imported: ${cgrepFile} containing ${evalChecks.length} check(s).`);
+
+		checks.push(...evalChecks);
+	} catch (e) {
+		console.log(`[cgrep failure] error processing ${cgrepFile}\nStack: ${e.stack}\n`);
 	}
 
 	return checks;
@@ -227,12 +211,7 @@ function logToConsole(
 	if (checkMatches.length === 0) return;
 
 	let alertLevel = alert;
-	if (
-		alertLevel !== 'error' &&
-		alertLevel !== 'warn' &&
-		alertLevel !== 'warning' &&
-		alertLevel !== 'info'
-	)
+	if (alertLevel !== 'error' && alertLevel !== 'warn' && alertLevel !== 'info')
 		alertLevel = 'error'; // Default to error.
 
 	// Console color codes.
@@ -243,15 +222,14 @@ function logToConsole(
 
 	let alertTextColor;
 	if (alertLevel === 'error') alertTextColor = redTextColor;
-	else if (alertLevel === 'warn' || alertLevel === 'warning') alertTextColor = yellowTextColor;
+	else if (alertLevel === 'warn') alertTextColor = yellowTextColor;
 	else if (alertLevel === 'info') alertTextColor = cyanTextColor;
 
-	console.log(`${alertTextColor}${alertLevel}${resetColor} ${checkMessage}`);
+	console.log(`\n${alertTextColor}${alertLevel}${resetColor} ${checkMessage}`);
 
 	for (const checkInfo of checkMatches) {
-		if (alert === 'error') checkStatus = 1;
 		const lineNumber = getLineNumber(checkInfo.startPosition, lineNumberRanges);
-		console.log(`@\n${filePath}:${lineNumber}\n${checkInfo.matchString}`);
+		console.log(`${filePath}:${lineNumber}`);
 	}
 }
 
@@ -303,50 +281,17 @@ function getLineNumber(position: number, lineNumberRanges: number[]) {
 	return lineNumber;
 }
 
-function getProjectFiles(directoryPath: string, gitignoreRules: any) {
-	const files: string[] = [];
-	iterateProjectFiles(directoryPath, gitignoreRules, (file) => files.push(file));
-	return files;
-}
-
-function iterateProjectFiles(
-	directoryPath: string,
-	gitignoreRules: any,
-	onFile: (file: string) => void
-) {
-	const files = fs.readdirSync(directoryPath);
-	const filteredFiles = filterFiles(
-		directoryPath,
-		files.map((file) => path.join(directoryPath, file)),
-		gitignoreRules
-	);
-
-	for (const file of filteredFiles) {
-		if (fs.statSync(file).isDirectory()) {
-			getProjectFiles(file, gitignoreRules);
-		} else {
-			if (options.debug) console.log(`Added: ${file}`);
-			onFile(file);
-		}
-	}
-}
-
-function getGitIgnoreRules(directoryPath: string) {
-	const gitIgnorePath = path.join(directoryPath, '.gitignore');
-	let rules: string[] = [];
+async function getProjectFiles(globPattern: string) {
+	const p = await import('globby');
 
 	try {
-		const gitIgnoreContent = fs.readFileSync(gitIgnorePath, 'utf-8');
-		rules = gitIgnoreContent.split('\n');
+		return await p.globby([globPattern], {
+			gitignore: true,
+			cwd: cwd,
+		});
 	} catch (error) {
-		// .gitignore file doesn't exist, or was locked, deleted, etc.
+		console.error('Error:', error);
 	}
-
-	return rules;
-}
-
-function filterFiles(directoryPath: string, fileNames: string[], gitignore: any) {
-	return fileNames.filter((file) => !gitignore.ignores(path.relative(directoryPath, file)));
 }
 
 // Copied from MDN docs.
