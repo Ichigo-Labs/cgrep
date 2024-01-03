@@ -184,7 +184,9 @@ function logToConsole(
 	}
 
 	const regex =
-		typeof regexOrText === 'string' ? new RegExp(escapeRegExp(regexOrText), 'g') : new RegExp(regexOrText, 'g');
+		typeof regexOrText === 'string'
+			? new RegExp(escapeRegExp(regexOrText), 'g')
+			: new RegExp(regexOrText, 'g');
 	const checkMatches: { startPosition: number; matchString: string }[] = [];
 
 	const limit = 50;
@@ -279,9 +281,12 @@ function getLineNumber(position: number, lineNumberRanges: number[][]) {
 		if (startPosition <= position && position < endPosition) {
 			const lineNumber = middleIndex + 1; // Add one because line numbers start at 1, not 0.
 			return lineNumber;
-		} if (endPosition <= position) { 	// Search right side.
+		}
+		if (endPosition <= position) {
+			// Search right side.
 			leftIndex = middleIndex + 1;
-		} else { 							// Search left side.
+		} else {
+			// Search left side.
 			rightIndex = middleIndex - 1;
 		}
 	}
