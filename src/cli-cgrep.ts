@@ -97,7 +97,7 @@ async function main() {
 
 		for (const check of checks) {
 			const result = check({ ...file, underline: boundLogToConsole });
-			if (result === false) {
+			if (result === false || result === 'fail') {
 				checkStatus = 1;
 			}
 		}

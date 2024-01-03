@@ -42,7 +42,7 @@ On run, `cgrep` will
                 "warn");
         }
         ```
-1. Each check will be run against all project files. `.gitignore` is respected. If a check returns `false`, the `cgrep` command will have a failure exit code.
+1. Each check will be run against all project files. `.gitignore` is respected. If a check returns boolean `false` or the string `fail`, the `cgrep` command will have a failure exit code.
     - Each check is passed the following args as an object:
         ```typescript
         /** Eg 'src/components/foo.js'. Relative posix path format. */
