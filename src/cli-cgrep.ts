@@ -229,6 +229,10 @@ function logToConsole(
 	console.log(`\n${alertTextColor}${alertLevel}${resetColor} ${checkMessage}`);
 
 	for (const checkInfo of checkMatches) {
+		if (alert === 'error') {
+			checkStatus = 1;
+		}
+
 		const lineNumber = getLineNumber(checkInfo.startPosition, lineNumberRanges);
 		console.log(`${filePath}:${lineNumber}`);
 	}
