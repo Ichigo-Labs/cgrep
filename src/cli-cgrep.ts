@@ -165,7 +165,7 @@ function logToConsole(
 	checkMessage: string,
 	filePath: string,
 	fileContents: string,
-	lineNumberRanges: number[],
+	lineNumberRanges: number[][],
 	alert?: 'error' | 'warn' | 'warning' | 'info'
 ) {
 	// Validate args passed in by consumers.
@@ -184,7 +184,7 @@ function logToConsole(
 	}
 
 	const regex =
-		typeof regexOrText === 'string' ? new RegExp(escapeRegExp(regexOrText), 'g') : regexOrText;
+		typeof regexOrText === 'string' ? new RegExp(escapeRegExp(regexOrText), 'g') : new RegExp(regexOrText, 'g');
 	const checkMatches: { startPosition: number; matchString: string }[] = [];
 
 	const limit = 50;
@@ -233,16 +233,16 @@ function logToConsole(
 }
 
 /*
-* Input: "hello\n World how\n are you?"
-* Output: [
-	0,7, 	// 'hello\n', 		line 1 [start index:end index]
-	8,19, 	// ' World how\n'	line 2 [start index:end index]
-	20,28 	// ' are you?' 		line 3 [start index:end index]
+Input: "hello\n World how\n are you?"
+Output: [
+	[0,7], 	// 'hello\n', 		line 1 [start index:end index]
+	[7,19], 	// ' World how\n'	line 2 [start index:end index]
+	[19,28] 	// ' are you?' 		line 3 [start index:end index]
 ]
 */
 function getLineNumberRanges(fileContents: string) {
 	let index = 0;
-	const lineNumberRanges = fileContents.split('\n').flatMap((line) => {
+	const lineNumberRanges = fileContents.split('\n').map((line) => {
 		const lineStartIndex = index;
 		// Typically one should avoid mutation in maps, but who's watching?
 		index = index + line.length + '\n'.length;
@@ -251,33 +251,40 @@ function getLineNumberRanges(fileContents: string) {
 		return [lineStartIndex, lineEndIndex];
 	});
 
-	// Fix last lineEndIndex.
-	// If file contents don't end with "\n", lineEndIndex is too large.
-	if (!fileContents.endsWith('\n')) lineNumberRanges[lineNumberRanges.length - 1] -= '\n'.length;
-
 	return lineNumberRanges;
 }
 
-function getLineNumber(position: number, lineNumberRanges: number[]) {
+/**
+ * @param position
+ * 	Index of character in file contents
+ * 	Example: 7, 25, etc.
+ * @param lineNumberRanges
+ * 	Array of start and end positions for each line.
+ * 	Example: [[0,7], [7,19], [19,28]]
+ * @returns line number
+ */
+function getLineNumber(position: number, lineNumberRanges: number[][]) {
 	const lastIndex = lineNumberRanges.length - 1;
-	const rangeMax = lineNumberRanges[lastIndex];
-	if (position > rangeMax)
-		throw new Error(`index of ${position} must not be greater than rangeMax of ${rangeMax}`);
-	if (position < 0) throw new Error('index must be non-negative.');
 
 	// Simple binary search for lowerbound.
 	let leftIndex = 0;
 	let rightIndex = lastIndex;
 	while (leftIndex <= rightIndex) {
+		// Eg pick the middle index between 0 and 2.
+		// [[0,7], [7,19], [19,28]] -> [7,19]
 		const middleIndex = Math.floor((rightIndex + leftIndex) / 2);
-		if (lineNumberRanges[middleIndex] < position) leftIndex = middleIndex + 1;
-		else rightIndex = middleIndex - 1;
-	}
 
-	// Each line has a start and end position in the lineNumberRanges array,
-	// so divide the leftIndex by 2, add 1, and take the floor to get the associated line number.
-	const lineNumber = Math.floor(leftIndex / 2 + 1);
-	return lineNumber;
+		// Eg [7,19]
+		const [startPosition, endPosition] = lineNumberRanges[middleIndex];
+		if (startPosition <= position && position < endPosition) {
+			const lineNumber = middleIndex + 1; // Add one because line numbers start at 1, not 0.
+			return lineNumber;
+		} if (endPosition <= position) { 	// Search right side.
+			leftIndex = middleIndex + 1;
+		} else { 							// Search left side.
+			rightIndex = middleIndex - 1;
+		}
+	}
 }
 
 async function getProjectFiles(globPattern: string) {
