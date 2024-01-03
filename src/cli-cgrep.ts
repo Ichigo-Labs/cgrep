@@ -229,7 +229,7 @@ function logToConsole(
 	console.log(`\n${alertTextColor}${alertLevel}${resetColor} ${checkMessage}`);
 
 	for (const checkInfo of checkMatches) {
-		if (alert === 'error') {
+		if (alertLevel === 'error') {
 			checkStatus = 1;
 		}
 
